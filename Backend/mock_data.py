@@ -13,7 +13,14 @@ MOCK_US_ZIP_STORE = {
         "area": "Manhattan",
         "serviceable": True,
         "risk_zone": "LOW",
-        "metro": "NYC Metro"
+        "metro": "NYC Metro",
+        "bank_agent": {
+            "agent_id": "NYC-AG-001",
+            "name": "Sarah Thompson",
+            "branch": "Midtown Manhattan",
+            "phone": "+1-212-555-0198",
+            "email": "sarah.thompson@bank.com"
+        }
     },
     "90001": {
         "country": "US",
@@ -24,7 +31,14 @@ MOCK_US_ZIP_STORE = {
         "area": "South Los Angeles",
         "serviceable": True,
         "risk_zone": "MEDIUM",
-        "metro": "LA Metro"
+        "metro": "LA Metro",
+        "bank_agent": {
+            "agent_id": "LA-AG-014",
+            "name": "Michael Rodriguez",
+            "branch": "South LA Branch",
+            "phone": "+1-323-555-0142",
+            "email": "michael.rodriguez@bank.com"
+        }
     },
     "60601": {
         "country": "US",
@@ -35,7 +49,14 @@ MOCK_US_ZIP_STORE = {
         "area": "Loop",
         "serviceable": True,
         "risk_zone": "LOW",
-        "metro": "Chicago Metro"
+        "metro": "Chicago Metro",
+        "bank_agent": {
+            "agent_id": "CC-AG-014",
+            "name": "Michael Rod",
+            "branch": "South CC Branch",
+            "phone": "+1-323-555-0142",
+            "email": "michael.rod@bank.com"
+        }
     },
     "73301": {
         "country": "US",
@@ -46,7 +67,14 @@ MOCK_US_ZIP_STORE = {
         "area": "Downtown",
         "serviceable": True,
         "risk_zone": "LOW",
-        "metro": "Austin Metro"
+        "metro": "Austin Metro",
+        "bank_agent": {
+            "agent_id": "TC-AG-001",
+            "name": "Sarah Tom",
+            "branch": "West Austin",
+            "phone": "+1-212-555-0198",
+            "email": "sarah.tom@bank.com"
+        }
     },
     "33101": {
         "country": "US",
@@ -57,6 +85,13 @@ MOCK_US_ZIP_STORE = {
         "area": "Downtown Miami",
         "serviceable": False,
         "risk_zone": "HIGH",
-        "metro": "Miami Metro"
+        "metro": "Miami Metro",
+        "bank_agent": {
+            "agent_id": "MDC-AG-014",
+            "name": "Michael Guez",
+            "branch": "South Miami Branch",
+            "phone": "+1-323-555-0142",
+            "email": "michael.guez@bank.com"
+        }
     }
 }

@@ -135,16 +135,27 @@ def verify_us_zip_code(zip_code: str) -> dict:
     return {
         "status": "verified",
         "location": zip_data,
+        "bank_agent": zip_data.get("bank_agent"),
         "verification_source": "MOCK_US_ZIP_STORE",
-        "confidence": 0.96
     }
 
 @tool
 def get_loan_requirements(loan_type: str) -> List[str]:
     """Returns required fields for a 'new' or 'refinance' loan."""
+    base_fields = [
+        "full_name",
+        "employment_type",
+        "annual_income",
+        "annual_expense",
+        "property_value",
+        "zip_code",
+        "requested_amount"
+    ]
+
     if "new" in loan_type.lower():
-        return ["full_name", "annual_income", "annual_expense", "employer_name", "requested_amount", "property_value", "zip_code"]
-    return ["full_name", "annual_income", "annual_expense", "existing_loan_id", "property_value", "zip_code"]
+        return base_fields + ["employer_name"]
+
+    return base_fields + ["existing_loan_id"]
 
 @tool
 def extract_from_doc(doc_name: str) -> dict:
@@ -155,7 +166,9 @@ def extract_from_doc(doc_name: str) -> dict:
 def check_loan_eligibility(
     full_name: str,
     annual_income: str,
-    annual_expense: str
+    annual_expense: str,
+    property_value: str,
+    requested_amount: str
 ) -> str:
     """
     Checks loan eligibility based on disposable income
@@ -166,9 +179,13 @@ def check_loan_eligibility(
         # Clean inputs (remove commas, currency symbols, spaces)
         clean_income = "".join(filter(str.isdigit, str(annual_income)))
         clean_expense = "".join(filter(str.isdigit, str(annual_expense)))
+        clean_value = "".join(filter(str.isdigit, str(property_value)))
+        clean_rqst_amount = "".join(filter(str.isdigit, str(requested_amount)))
 
         income_val = int(clean_income)
         expense_val = int(clean_expense)
+        property_val = int(clean_value)
+        rqst_amount = int(clean_rqst_amount)
 
         disposable_income = income_val - expense_val
 
@@ -182,14 +199,20 @@ def check_loan_eligibility(
                 f"minimum required is {MIN_DISPOSABLE_INCOME}."
             )
 
-        max_loan_amount = disposable_income * LOAN_MULTIPLIER
+        max_loan_amount = min(
+            disposable_income * LOAN_MULTIPLIER,
+            0.8 * property_val
+        )
+
+        is_rqstamt_higher = rqst_amount > max_loan_amount
 
         return (
             f"ELIGIBILITY CHECK: {full_name} is ELIGIBLE for the loan.\n"
             f"Annual Income: {income_val}\n"
             f"Annual Expense: {expense_val}\n"
             f"Disposable Income: {disposable_income}\n"
-            f"Maximum Eligible Loan Amount: {max_loan_amount}"
+            f"Maximum Eligible Loan Amount: {max_loan_amount}\n"
+            f"Requested_amount_exceeds_limit: {is_rqstamt_higher}"
         )
 
     except Exception:
@@ -253,16 +276,33 @@ def assistant(state: AgentState):
     - User Account Data (Already Known): {known_info_str}
     - Ask for 'New' or 'Refinance' and call 'get_loan_requirements'.
     - Required info for this loan: {reqs}.
-    
+
+    EMPLOYMENT RULES:
+    - Ask for employment_type if not known.
+    - employment_type can be:
+    - Salaried
+    - Self Employed
+    - Business Owner
+    - Other
+
+    SELF-EMPLOYED HANDLING:
+    - If employment_type is Self Employed or Business Owner:
+    - DO NOT finalize eligibility automatically.
+    - Inform the user that a local bank agent will contact them.
+    - Use bank agent info derived from ZIP code
+    - Clearly state that income source verification is required
+
     STRATEGY FOR DATA COLLECTION:
-    1. Look at the "User Account Data" above. 
-    2. If a required field (like 'full_name') is already available in the account data (e.g., 'name'), DO NOT ask the user for it.
-    3. Only ask the user for the fields that are in the "Required info" list but NOT present in the "User Account Data".
-    4. You can suggest document upload to fill remaining fields.
-    
+    1. Look at the "User Account Data".
+    2. Do NOT ask for fields already present.
+    3. Ask only missing required fields.
+    4. You may suggest document upload.
+
     ELIGIBILITY:
     - Once you have all required fields (either from account data or user input), call 'check_loan_eligibility'.
     - If eligible, ask for permission to 'submit_loan_application'.
+    - If employment_type is Self Employed: Also explain next steps and agent involvement.
+    - If requested_amount is higher than Maximum Eligible Loan Amount then ask the user to reduce the request amount below maximum. 
     """
     
     prompt = [SystemMessage(content=system_content)] + state["messages"]
@@ -277,8 +317,13 @@ def state_updater(state: AgentState):
     if isinstance(last_msg, ToolMessage):
         try:
             content_data = ast.literal_eval(last_msg.content)
-            if isinstance(content_data, dict) and "account_details" in content_data:
-                new_updates["user_account"] = content_data["account_details"]
+            if isinstance(content_data, dict):
+                if "account_details" in content_data:
+                    new_updates["user_account"] = content_data["account_details"]
+                
+                if "bank_agent" in content_data:
+                    new_updates["bank_agent"] = content_data["bank_agent"]
+                
             if isinstance(content_data, list):
                 new_updates["required_fields"] = content_data
         except:
