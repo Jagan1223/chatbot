@@ -61,8 +61,8 @@ def verify_otp_and_fetch_account(mobile: str, otp: str) -> dict:
 def get_loan_requirements(loan_type: str) -> List[str]:
     """Returns required fields for a 'new' or 'refinance' loan."""
     if "new" in loan_type.lower():
-        return ["full_name", "annual_income", "employer_name", "requested_amount"]
-    return ["full_name", "annual_income", "existing_loan_id", "property_value"]
+        return ["full_name", "annual_income", "annual_expense", "employer_name", "requested_amount"]
+    return ["full_name", "annual_income", "annual_expense", "existing_loan_id", "property_value"]
 
 @tool
 def extract_from_doc(doc_name: str) -> dict:
@@ -70,22 +70,52 @@ def extract_from_doc(doc_name: str) -> dict:
     return {"full_name": "John Doe", "annual_income": "95000", "employer_name": "Tech Corp"}
 
 @tool
-def check_loan_eligibility(full_name: str, annual_income: str) -> str:
+def check_loan_eligibility(
+    full_name: str,
+    annual_income: str,
+    annual_expense: str
+) -> str:
     """
-    Checks if a user is eligible for a loan based on their income.
-    Input annual_income should be a numeric string (e.g., '50000').
+    Checks loan eligibility based on disposable income
+    (annual income - annual expense) and calculates
+    maximum eligible loan amount.
     """
     try:
-        # Clean the string (remove commas, dollar signs, spaces)
+        # Clean inputs (remove commas, currency symbols, spaces)
         clean_income = "".join(filter(str.isdigit, str(annual_income)))
+        clean_expense = "".join(filter(str.isdigit, str(annual_expense)))
+
         income_val = int(clean_income)
-        
-        if income_val >= 50000:
-            return f"ELIGIBILITY CHECK: {full_name} is ELIGIBLE for the loan. You may proceed to submit."
-        else:
-            return f"ELIGIBILITY CHECK: {full_name} is NOT ELIGIBLE. Minimum income of 50,000 required."
-    except Exception as e:
-        return f"ERROR: Could not process income value '{annual_income}'. Please provide a valid number."
+        expense_val = int(clean_expense)
+
+        disposable_income = income_val - expense_val
+
+        MIN_DISPOSABLE_INCOME = 50000
+        LOAN_MULTIPLIER = 10
+
+        if disposable_income < MIN_DISPOSABLE_INCOME:
+            return (
+                f"ELIGIBILITY CHECK: {full_name} is NOT ELIGIBLE for the loan. "
+                f"Disposable income is {disposable_income}, "
+                f"minimum required is {MIN_DISPOSABLE_INCOME}."
+            )
+
+        max_loan_amount = disposable_income * LOAN_MULTIPLIER
+
+        return (
+            f"ELIGIBILITY CHECK: {full_name} is ELIGIBLE for the loan.\n"
+            f"Annual Income: {income_val}\n"
+            f"Annual Expense: {expense_val}\n"
+            f"Disposable Income: {disposable_income}\n"
+            f"Maximum Eligible Loan Amount: {max_loan_amount}"
+        )
+
+    except Exception:
+        return (
+            "ERROR: Could not process income or expense values. "
+            "Please provide valid numeric inputs."
+        )
+
 
 @tool
 def submit_loan_application(details: str) -> str:
@@ -96,7 +126,9 @@ def submit_loan_application(details: str) -> str:
             cursor.execute("INSERT INTO loan_applications (details) VALUES (?)", (details,))
             conn.commit()
             ref_id = cursor.lastrowid
-        return f"SUCCESS: Your loan application has been submitted successfully. Reference: L-2024-{ref_id}"
+            
+        ref_id_7 = f"{ref_id:07d}"
+        return f"SUCCESS: Your loan application has been submitted successfully. Reference: sub{ref_id_7}"
     except Exception as e:
         return f"DATABASE ERROR: {str(e)}"
 
