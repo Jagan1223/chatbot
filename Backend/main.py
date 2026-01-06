@@ -13,9 +13,13 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.message import add_messages
 from dotenv import load_dotenv
+import random
+import time
+import sqlite3
+
+from mock_data import MOCK_US_ZIP_STORE, MOCK_USER_DB
 
 load_dotenv()
-import sqlite3
 
 DB_PATH = "loans.db"
 
@@ -35,34 +39,112 @@ def init_db():
 # Initialize the DB
 init_db()
 
-# --- Mock Data ---
-MOCK_DB = {
-    "1234567890": {"name": "John Doe", "email": "john@example.com", "customer_tier": "Gold"},
-    "9876543210": {"name": "Alice Smith", "email": "alice@example.com", "customer_tier": "Silver"}
-}
 
 # --- Tools ---
-
+otp_store = {}
 @tool
 def send_otp(mobile: str) -> str:
-    """Sends a mock OTP to the user's mobile. Use this first for verification."""
-    return "SUCCESS: A verification code has been sent."
+    """
+    Generates and stores a mock OTP for the given mobile number.
+    """
+    try:
+        otp = random.randint(1000, 9999)
+        expiry = int(time.time()) + 300        # 5 minutes expiry
+        print("OTP: ",otp)
+        otp_store[mobile] = {
+            "otp": str(otp),
+            "expires_at": expiry
+        }
+
+        # In real systems, send via SMS gateway here
+        return "SUCCESS: A verification code has been sent."
+
+    except Exception as e:
+        return f"ERROR: Failed to generate OTP. {str(e)}"
 
 @tool
 def verify_otp_and_fetch_account(mobile: str, otp: str) -> dict:
-    """Verifies OTP and retrieves account info."""
-    if otp == "1234":
-        account = MOCK_DB.get(mobile)
-        if account:
-            return {"status": "success", "account_details": account}
-    return {"status": "error", "message": "Invalid OTP or mobile number."}
+    """
+    Verifies OTP from otp_store and retrieves account info
+    associated with the given mobile number.
+    """
+    record = otp_store.get(mobile)
+
+    if not record:
+        return {
+            "status": "error",
+            "message": "OTP not found. Please request a new OTP."
+        }
+
+    if time.time() > record["expires_at"]:
+        del otp_store[mobile]
+        return {
+            "status": "error",
+            "message": "OTP expired. Please request a new OTP."
+        }
+
+    if record["otp"] != otp:
+        return {
+            "status": "error",
+            "message": "Invalid OTP."
+        }
+
+    # OTP is valid — remove it after successful verification
+    del otp_store[mobile]
+
+    account = MOCK_USER_DB.get(mobile)
+    if not account:
+        return {
+            "status": "error",
+            "message": "No account found for this mobile number."
+        }
+
+    return {
+        "status": "success",
+        "account_details": account
+    }
+
+@tool
+def verify_us_zip_code(zip_code: str) -> dict:
+    """
+    Mock tool to verify US ZIP codes (5-digit).
+    """
+
+    # Format validation (US ZIP = 5 digits)
+    if not zip_code.isdigit() or len(zip_code) != 5:
+        return {
+            "status": "error",
+            "reason": "Invalid US ZIP format"
+        }
+
+    zip_data = MOCK_US_ZIP_STORE.get(zip_code)
+
+    if not zip_data:
+        return {
+            "status": "not_found",
+            "reason": "ZIP code not found in mock store"
+        }
+
+    if not zip_data["serviceable"]:
+        return {
+            "status": "rejected",
+            "reason": "ZIP not serviceable",
+            "location": zip_data
+        }
+
+    return {
+        "status": "verified",
+        "location": zip_data,
+        "verification_source": "MOCK_US_ZIP_STORE",
+        "confidence": 0.96
+    }
 
 @tool
 def get_loan_requirements(loan_type: str) -> List[str]:
     """Returns required fields for a 'new' or 'refinance' loan."""
     if "new" in loan_type.lower():
-        return ["full_name", "annual_income", "annual_expense", "employer_name", "requested_amount"]
-    return ["full_name", "annual_income", "annual_expense", "existing_loan_id", "property_value"]
+        return ["full_name", "annual_income", "annual_expense", "employer_name", "requested_amount", "property_value", "zip_code"]
+    return ["full_name", "annual_income", "annual_expense", "existing_loan_id", "property_value", "zip_code"]
 
 @tool
 def extract_from_doc(doc_name: str) -> dict:
@@ -132,7 +214,7 @@ def submit_loan_application(details: str) -> str:
     except Exception as e:
         return f"DATABASE ERROR: {str(e)}"
 
-all_tools = [send_otp, verify_otp_and_fetch_account, get_loan_requirements, extract_from_doc, check_loan_eligibility, submit_loan_application]
+all_tools = [send_otp, verify_otp_and_fetch_account, get_loan_requirements, extract_from_doc, check_loan_eligibility, submit_loan_application, verify_us_zip_code]
 
 # --- State ---
 
