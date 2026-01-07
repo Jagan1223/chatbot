@@ -5,6 +5,7 @@ from langchain_core.messages import BaseMessage
 class LoanState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
     is_verified: bool
-    account_exists: bool          # 🆕
+    account_exists: bool          
     user_account: Dict[str, Any]
     required_fields: List[str]
+    active_agent: str

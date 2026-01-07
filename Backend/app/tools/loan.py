@@ -1,6 +1,6 @@
 from langchain_core.tools import tool
 from typing import List
-from app.db.models import save_loan
+from app.db.models import get_loans_by_user, save_loan
 
 @tool
 def get_loan_requirements(loan_type: str) -> List[str]:
@@ -80,10 +80,60 @@ def check_loan_eligibility(
         )
     
 @tool
-def submit_loan_application(details: str) -> str:
-    """Finalizes and submits the application."""
+def submit_loan_application(user_id: str, details: str) -> str:
+    """
+    Submits a loan application.
+
+    Args:
+        user_id (str): Unique identifier of the user submitting the loan.
+        details (str): Complete loan application details in serialized JSON or text form.
+
+    Returns:
+        str: Confirmation message with reference number if successful,
+             or an error message if submission fails.
+    """
     try:
-        ref = save_loan(details)
-        return f"Loan submitted successfully. REF: sub{ref:07d}"
+        ref_id = save_loan(user_id=user_id, details=details)
+        return f"Loan submitted successfully. REF: sub{ref_id:07d}"
     except Exception as e:
         return f"DATABASE ERROR: {str(e)}"
+
+@tool
+def get_user_loan_requests(user_id: str) -> dict:
+    """
+    Fetches all loan applications submitted by a specific user.
+
+    Args:
+        user_id (str): Unique identifier of the user whose loan applications
+                       need to be retrieved.
+
+    Returns:
+        dict:
+            status (str): "success" if loans are found,
+                          "not_found" if no loans exist,
+                          "error" if a database error occurs.
+            loans (list, optional): List of loan records. Each record contains:
+                - loan_id (int): Unique loan identifier
+                - details (str): Loan application details
+                - status (str): Current loan status
+                - submission_date (str): Timestamp of submission
+    """
+    try:
+        loans = get_loans_by_user(user_id)
+
+        if not loans:
+            return {
+                "status": "not_found",
+                "message": "No loan applications found for this user."
+            }
+
+        return {
+            "status": "success",
+            "loans": loans
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }

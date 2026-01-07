@@ -27,7 +27,8 @@ async def chat(input: ChatInput):
             "is_verified": False,
             "account_exists": None,
             "user_account": {},
-            "required_fields": []
+            "required_fields": [],
+            "active_agent": "loan" 
         })
 
     # 4️⃣ Invoke graph

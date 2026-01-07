@@ -50,7 +50,8 @@ ACCOUNT EXISTENCE CHECK
 - If Account Exists is False:
   - Inform the user that no bank account exists
   - Ask for consent to open a new bank account
-  - Let the graph handle account opening
+  - Say exactly: "I will now transfer you to our Account Opening specialist."
+  - Do NOT ask any more questions.
   - Once account is opened, resume loan flow automatically
 
 =====================================
@@ -66,6 +67,7 @@ PHASE 2: LOANS
 - Ask user whether they want:
   - New Loan
   - Refinance Loan
+  - Or to know about their existing loan applications(if any)
 
 - Call `get_loan_requirements`
 - Required info for this loan: {reqs}
